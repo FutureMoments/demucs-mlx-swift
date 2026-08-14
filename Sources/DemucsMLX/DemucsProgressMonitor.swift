@@ -64,6 +64,7 @@ struct SeparationMonitor: @unchecked Sendable {
 			cancelToken: self.cancelToken,
 			progressHandler: { localFraction, stage in
 				let mapped = start + localFraction * (end - start)
+                print("Mapped progress: ", mapped, start, end)
 				self.progressHandler?(mapped, stage)
 			}
 		)

@@ -35,6 +35,7 @@ struct SeparationEngine {
 
             let shiftMonitor = monitor?.scoped(start: shiftProgress, end: shiftProgressEnd)
 
+            print("Shift Monitor: ", shiftProgress, shiftProgressEnd)
             shiftMonitor?.reportProgress(shiftProgress, stage: "Shift \(shiftIndex + 1)/\(parameters.shifts)")
 
             let shift = rng.nextInt(upperBound: maxShift)
