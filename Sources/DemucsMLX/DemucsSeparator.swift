@@ -172,7 +172,7 @@ public final class DemucsSeparator: @unchecked Sendable {
 
     // MARK: - Internal
 
-    private func separate(audio: DemucsAudio, monitor: SeparationMonitor?) throws -> DemucsSeparationResult {
+    private func separate(audio: DemucsAudio, monitor: SeparationMonitor? = nil) throws -> DemucsSeparationResult {
         let validated = try parameters.validated()
 
         try monitor?.checkCancellation()
@@ -202,12 +202,13 @@ public final class DemucsSeparator: @unchecked Sendable {
         try monitor?.checkCancellation()
         monitor?.reportProgress(0.0, stage: "Starting separation")
 
-        let engine = SeparationEngine(model: model, parameters: validated, monitor: monitor)
+        let engine = SeparationEngine(model: model, parameters: validated)
         let stemsFlat = try engine.separate(
             mix: resampled.samples,
             channels: descriptor.audioChannels,
             frames: resampled.frames,
-            sampleRate: descriptor.sampleRate
+            sampleRate: descriptor.sampleRate,
+            monitor: monitor
         )
 
         try monitor?.checkCancellation()

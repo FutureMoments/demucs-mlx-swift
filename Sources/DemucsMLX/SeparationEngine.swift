@@ -4,7 +4,7 @@ import Foundation
 struct SeparationEngine {
     let model: StemSeparationModel
     let parameters: DemucsSeparationParameters
-    let monitor: SeparationMonitor?
+    //let monitor: SeparationMonitor?
 
     private var sourceCount: Int { model.descriptor.sourceNames.count }
 
@@ -12,13 +12,15 @@ struct SeparationEngine {
         mix: [Float],
         channels: Int,
         frames: Int,
-        sampleRate: Int
+        sampleRate: Int,
+        monitor: SeparationMonitor?
     ) throws -> [Float] {
-        try self.monitor?.checkCancellation()
+        
+        try monitor?.checkCancellation()
 
         if parameters.shifts <= 1 {
-            self.monitor?.reportProgress(0.0, stage: "Separating")
-            return try separateNoShift(mix: mix, channels: channels, frames: frames, sampleRate: sampleRate)
+            monitor?.reportProgress(0.0, stage: "Separating")
+            return try separateNoShift(mix: mix, channels: channels, frames: frames, sampleRate: sampleRate, monitor: monitor)
         }
 
         let maxShift = max(1, sampleRate / 2)
@@ -26,12 +28,12 @@ struct SeparationEngine {
         var accumulator = [Float](repeating: 0, count: sourceCount * channels * frames)
 
         for shiftIndex in 0..<parameters.shifts {
-            try self.monitor?.checkCancellation()
+            try monitor?.checkCancellation()
 
             let shiftProgress: Float = Float(shiftIndex) / Float(parameters.shifts)
             let shiftProgressEnd: Float = Float(shiftIndex+1) / Float(parameters.shifts)
 
-            let shiftMonitor = self.monitor?.scoped(start: shiftProgress, end: shiftProgressEnd)
+            let shiftMonitor = monitor?.scoped(start: shiftProgress, end: shiftProgressEnd)
 
             shiftMonitor?.reportProgress(shiftProgress, stage: "Shift \(shiftIndex + 1)/\(parameters.shifts)")
 
@@ -56,7 +58,7 @@ struct SeparationEngine {
         channels: Int,
         frames: Int,
         sampleRate: Int,
-        monitor: SeparationMonitor? = nil
+        monitor: SeparationMonitor?
     ) throws -> [Float] {
         if !parameters.split {
             return try runModelOnce(mix: mix, channels: channels, frames: frames, monitor: monitor)
@@ -95,16 +97,12 @@ struct SeparationEngine {
 
             // Create a scoped monitor so the model reports sub-step progress
             // mapped to this batch's slice of overall progress
-            let batchMonitor: SeparationMonitor?
-            if let m = self.monitor {
-                let total = Float(offsets.count)
-                batchMonitor = m.scoped(
-                    start: Float(batchStartChunkIndex) / total,
-                    end: Float(batchStartChunkIndex + batchCount) / total
-                )
-            } else {
-                batchMonitor = nil
-            }
+            let total = Float(offsets.count)
+            
+            let batchMonitor = monitor?.scoped(
+                start: Float(batchStartChunkIndex) / total,
+                end: Float(batchStartChunkIndex + batchCount) / total
+            )
 
             let output = try runModelBatch(
                 batchData: batchData,
@@ -157,7 +155,7 @@ struct SeparationEngine {
         }
 
         for (chunkIndex, chunkOffset) in offsets.enumerated() {
-            try self.monitor?.checkCancellation()
+            try monitor?.checkCancellation()
 
             let chunkLength = min(segmentFrames, frames - chunkOffset)
             var chunk = [Float](repeating: 0, count: channels * segmentFrames)
@@ -181,7 +179,7 @@ struct SeparationEngine {
             }
         }
 
-        try self.monitor?.checkCancellation()
+        try monitor?.checkCancellation()
         try flushBatch()
 
         // Invert sumWeight for multiplication (faster than per-element division)
@@ -218,7 +216,7 @@ struct SeparationEngine {
         mix: [Float],
         channels: Int,
         frames: Int,
-        monitor: SeparationMonitor? = nil
+        monitor: SeparationMonitor?
 
     ) throws -> [Float] {
         try runModelBatch(batchData: mix, batchCount: 1, channels: channels, frames: frames, monitor: monitor)
@@ -229,7 +227,7 @@ struct SeparationEngine {
         batchCount: Int,
         channels: Int,
         frames: Int,
-        monitor: SeparationMonitor? = nil
+        monitor: SeparationMonitor?
     ) throws -> [Float] {
         try model.predict(
             batchData: batchData,
