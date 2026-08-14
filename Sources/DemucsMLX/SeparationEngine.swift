@@ -33,10 +33,11 @@ struct SeparationEngine {
             let shiftProgress: Float = Float(shiftIndex) / Float(parameters.shifts)
             let shiftProgressEnd: Float = Float(shiftIndex+1) / Float(parameters.shifts)
 
-            let shiftMonitor = monitor?.scoped(start: shiftProgress, end: shiftProgressEnd)
 
             print("Shift Monitor: ", shiftProgress, shiftProgressEnd)
-            shiftMonitor?.reportProgress(shiftProgress, stage: "Shift \(shiftIndex + 1)/\(parameters.shifts)")
+            monitor?.reportProgress(shiftProgress, stage: "Shift \(shiftIndex + 1)/\(parameters.shifts)")
+
+            let shiftMonitor = monitor?.scoped(start: shiftProgress, end: shiftProgressEnd)
 
             let shift = rng.nextInt(upperBound: maxShift)
             let rolled = rollChannelMajor(mix, channels: channels, frames: frames, shift: shift)
