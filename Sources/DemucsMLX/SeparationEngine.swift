@@ -29,11 +29,15 @@ struct SeparationEngine {
             try self.monitor?.checkCancellation()
 
             let shiftProgress: Float = Float(shiftIndex) / Float(parameters.shifts)
-            self.monitor?.reportProgress(shiftProgress, stage: "Shift \(shiftIndex + 1)/\(parameters.shifts)")
+            let shiftProgressEnd: Float = Float(shiftIndex+1) / Float(parameters.shifts)
+
+            let shiftMonitor = self.monitor?.scoped(start: shiftProgress, end: shiftProgressEnd)
+
+            shiftMonitor?.reportProgress(shiftProgress, stage: "Shift \(shiftIndex + 1)/\(parameters.shifts)")
 
             let shift = rng.nextInt(upperBound: maxShift)
             let rolled = rollChannelMajor(mix, channels: channels, frames: frames, shift: shift)
-            let estimate = try separateNoShift(mix: rolled, channels: channels, frames: frames, sampleRate: sampleRate)
+            let estimate = try separateNoShift(mix: rolled, channels: channels, frames: frames, sampleRate: sampleRate, monitor: shiftMonitor)
             let unrolled = rollStems(estimate, sources: sourceCount, channels: channels, frames: frames, shift: (frames - shift) % max(1, frames))
             for i in 0..<accumulator.count {
                 accumulator[i] += unrolled[i]
@@ -51,10 +55,11 @@ struct SeparationEngine {
         mix: [Float],
         channels: Int,
         frames: Int,
-        sampleRate: Int
+        sampleRate: Int,
+        monitor: SeparationMonitor? = nil
     ) throws -> [Float] {
         if !parameters.split {
-            return try runModelOnce(mix: mix, channels: channels, frames: frames)
+            return try runModelOnce(mix: mix, channels: channels, frames: frames, monitor: monitor)
         }
 
         let defaultSegment = model.descriptor.defaultSegmentSeconds
@@ -65,7 +70,7 @@ struct SeparationEngine {
         // Fast-path short clips: avoid overlap-add chunk scheduling when it would create
         // at most two windows. This removes substantial overhead from repeated STFT/iSTFT.
         if frames <= segmentFrames + stride {
-            return try runModelOnce(mix: mix, channels: channels, frames: frames)
+            return try runModelOnce(mix: mix, channels: channels, frames: frames, monitor: monitor)
         }
 
         var offsets: [Int] = []
@@ -212,9 +217,11 @@ struct SeparationEngine {
     private func runModelOnce(
         mix: [Float],
         channels: Int,
-        frames: Int
+        frames: Int,
+        monitor: SeparationMonitor? = nil
+
     ) throws -> [Float] {
-        try runModelBatch(batchData: mix, batchCount: 1, channels: channels, frames: frames, monitor: self.monitor)
+        try runModelBatch(batchData: mix, batchCount: 1, channels: channels, frames: frames, monitor: monitor)
     }
 
     private func runModelBatch(
